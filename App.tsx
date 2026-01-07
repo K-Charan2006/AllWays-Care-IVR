@@ -1,191 +1,225 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ivrFlowData, uiStrings } from './constants';
-import type { MainMenuOption, SymptomOption, ResourceOption, NotificationOption, TranslatableString, SubFlowOption } from './types';
-import { Header } from './components/Header';
-import { Footer } from './components/Footer';
-import { PhoneSimulator } from './components/PhoneSimulator';
-import { speak, stopSpeech } from './utils/speech';
+import React, { useState, useEffect } from 'react';
+import { Sidebar } from './components/Sidebar';
+import { MobileHeader } from './components/MobileHeader';
+import Dashboard from './features/Dashboard';
+import Telemedicine from './features/Telemedicine';
+import CommunityForum from './features/CommunityForum';
+import WearableIntegration from './features/WearableIntegration';
+import MedicineFinder from './features/MedicineFinder';
+import MentalHealthSupport from './features/MentalHealthSupport';
+import PersonalizedHealthPlan from './features/PersonalizedHealthPlan';
+import PredictiveAnalytics from './features/PredictiveAnalytics';
+import AIInsights from './features/AIInsights';
+import GenomicAnalysis from './features/GenomicAnalysis';
+import Favorites from './features/Favorites';
+import Cart from './features/Cart';
+import { VoiceControlProvider, useVoiceControl } from './context/VoiceControlContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import { NotificationProvider } from './context/NotificationContext';
+import { AccessibilityProvider, useAccessibility } from './context/AccessibilityContext';
+import { LiveAudioProvider, useLiveAudio } from './context/LiveAudioContext';
+import { LiveVoiceInterface } from './components/LiveVoiceInterface';
+import { VoiceControlButton } from './components/VoiceControlButton';
+import { ChatAssistantButton } from './components/ChatAssistantButton';
+import { ChatbotWidget } from './components/ChatbotWidget';
+import { CommandToast } from './components/CommandToast';
+import { NotificationBell } from './components/NotificationBell';
+import { MedicationReminder } from './components/MedicationReminder';
+import AIHealthAssistant from './features/AIHealthAssistant';
+import ResourceFinder from './features/ResourceFinder';
+import SymptomChecker from './features/SymptomChecker';
+import AppointmentPrep from './features/AppointmentPrep';
+import HealthRecords from './features/HealthRecords';
+import QuickCommunicate from './features/QuickCommunicate';
+import VitalsView from './features/vitals/VitalsView';
+import MedicineIdentifier from './features/MedicineIdentifier';
+import InclusiveBridge from './features/InclusiveBridge';
+import type { View, FamilyMember } from './types';
+import { EmergencyProvider } from './context/EmergencyContext';
+import { EmergencySOSButton } from './components/EmergencySOSButton';
+import EmergencyMode from './features/EmergencyMode';
+import MedicationReminders from './features/MedicationReminders';
+import AuthPage from './features/LoginPage';
+import ProfilePage from './features/ProfilePage';
+import AshaConnect from './features/AshaConnect';
+import MedicalCamps from './features/MedicalCamps';
+import FamilyHub from './features/FamilyHub';
+import HealthSchemes from './features/HealthSchemes';
+import { create as createStore } from 'zustand';
+import { speak } from './utils/tts';
 
-type IvrLocation = 'WELCOME' | 'MAIN_MENU' | `SUB_FLOW_${string}` | `RESPONSE_${string}_${string}`;
+// --- Global Family Store ---
+const FAMILY_MEMBERS_KEY = 'allwayscare-family-members';
+interface FamilyState {
+    members: FamilyMember[];
+    selectedMemberId: string;
+    hydrated: boolean;
+    actions: {
+        hydrate: () => void;
+        addMember: (member: Omit<FamilyMember, 'id'>) => void;
+        removeMember: (id: string) => void;
+        selectMember: (id: string) => void;
+        getSelectedMember: (currentUserProfile: FamilyMember) => FamilyMember;
+    };
+}
+export const useFamilyStore = createStore<FamilyState>((set, get) => ({
+    members: [],
+    selectedMemberId: 'currentUser',
+    hydrated: false,
+    actions: {
+        hydrate: () => {
+            const stored = localStorage.getItem(FAMILY_MEMBERS_KEY);
+            if (stored) set({ members: JSON.parse(stored), hydrated: true });
+            else set({ hydrated: true });
+        },
+        addMember: (member) => {
+            const newMembers = [...get().members, { ...member, id: new Date().toISOString() }];
+            localStorage.setItem(FAMILY_MEMBERS_KEY, JSON.stringify(newMembers));
+            set({ members: newMembers });
+        },
+        removeMember: (id) => {
+            const newMembers = get().members.filter(m => m.id !== id);
+            localStorage.setItem(FAMILY_MEMBERS_KEY, JSON.stringify(newMembers));
+            set({ members: newMembers });
+        },
+        selectMember: (id) => set({ selectedMemberId: id }),
+        getSelectedMember: (currentUser) => {
+            const state = get();
+            return state.selectedMemberId === 'currentUser' ? currentUser : state.members.find(m => m.id === state.selectedMemberId) || currentUser;
+        }
+    }
+}));
+
+const VisualCuesOverlay: React.FC = () => {
+    const { isListening } = useVoiceControl();
+    const { settings } = useAccessibility();
+    const { isLiveActive } = useLiveAudio();
+    if (!settings.visualCuesMode) return null;
+    return (
+        <div className={`fixed inset-0 pointer-events-none z-[100] transition-all duration-500 ${settings.persona === 'deaf' ? 'animate-vibrate-visual' : ''}`}>
+            {(isListening || isLiveActive) && <div className="absolute inset-0 border-[12px] border-cyan-500/40 animate-pulse"></div>}
+        </div>
+    );
+};
 
 const App: React.FC = () => {
-  const [status, setStatus] = useState<'IDLE' | 'ACTIVE'>('IDLE');
-  const [location, setLocation] = useState<IvrLocation>('WELCOME');
-  const [history, setHistory] = useState<IvrLocation[]>([]);
-  const [displayText, setDisplayText] = useState<string[]>(['Press CALL to start.']);
-  const [language, setLanguage] = useState('en');
-  const [symptomHistory, setSymptomHistory] = useState<string[]>([]);
-  
-  const screenRef = useRef<HTMLDivElement>(null);
+    const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('allwayscare-user-token'));
 
-  useEffect(() => {
-    const t = (textObj: TranslatableString) => textObj[language] || textObj.en;
+    return (
+        <LanguageProvider>
+            <AccessibilityProvider>
+                <NotificationProvider>
+                    <EmergencyProvider>
+                        <VoiceControlProvider>
+                            <LiveAudioProvider onNavigate={(v) => window.dispatchEvent(new CustomEvent('nav', {detail: v}))}>
+                                {!isLoggedIn ? (
+                                    <AuthPage onLoginSuccess={() => setIsLoggedIn(true)} />
+                                ) : (
+                                    <AppContentWrapper onLogout={() => setIsLoggedIn(false)} />
+                                )}
+                            </LiveAudioProvider>
+                        </VoiceControlProvider>
+                    </EmergencyProvider>
+                </NotificationProvider>
+            </AccessibilityProvider>
+        </LanguageProvider>
+    );
+};
+
+const AppContentWrapper: React.FC<{onLogout: () => void}> = ({ onLogout }) => {
+    const [activeView, setActiveView] = useState<View>('dashboard');
     
-    const getDisplayText = (): string[] => {
-      if (status === 'IDLE') return [t(uiStrings.pressCall)];
-      
-      switch (location) {
-        case 'WELCOME': {
-          const lines = [t(ivrFlowData.welcomeMessage.prompt)];
-          ivrFlowData.languages.forEach(l => lines.push(`${l.key}: ${l.language}`));
-          return lines;
-        }
-        case 'MAIN_MENU': {
-          const lines = [t(uiStrings.chooseService)];
-          ivrFlowData.mainMenu.forEach(o => lines.push(`${o.key}: ${t(o.feature)}`));
-          return lines;
-        }
-        default: {
-          if (location.startsWith('SUB_FLOW_')) {
-            const menuKey = location.replace('SUB_FLOW_', '');
-            const menu = ivrFlowData.mainMenu.find(m => m.key === menuKey);
-            if (!menu || !menu.subFlow) return [t(uiStrings.error)];
-            
-            const lines = [`"${t(menu.subFlow.prompt)}"`];
-            if (menu.subFlow.options.length > 0) {
-              menu.subFlow.options.forEach((opt: SubFlowOption) => {
-                  const optionText = 'symptom' in opt ? t(opt.symptom) : t(opt.option);
-                  lines.push(`${opt.key}: ${optionText}`);
-              });
-            } else {
-               lines.push("...");
-            }
-            return lines;
-          }
-          if (location.startsWith('RESPONSE_')) {
-            const [menuKey, optionKey] = location.replace('RESPONSE_', '').split('_');
-            const menu = ivrFlowData.mainMenu.find(m => m.key === menuKey);
-            const option = menu?.subFlow?.options?.find((o) => o.key === optionKey);
-            
-            if (menuKey === '3' && optionKey === '1') {
-                const historyLines = symptomHistory.length > 0 
-                  ? [t(uiStrings.historyTitle), ...symptomHistory.map((s, i) => `${i+1}. ${s}`)]
-                  : ["No history found."];
-                return [...historyLines, " ", t(uiStrings.pressBack)];
-            }
+    useEffect(() => {
+        const handleNav = (e: any) => setActiveView(e.detail);
+        window.addEventListener('nav', handleNav);
+        return () => window.removeEventListener('nav', handleNav);
+    }, []);
 
-            if (!option) return [t(uiStrings.error)];
-            
-            const responseText = 'symptom' in option
-              ? t((option as SymptomOption).response)
-              : t((option as ResourceOption | NotificationOption).description);
-              
-            return [t(uiStrings.response), responseText, " ", t(uiStrings.pressBack)];
-          }
-          return [t(uiStrings.unknownState)];
+    return <AppInner activeView={activeView} setActiveView={setActiveView} onLogout={onLogout} />;
+};
+
+const AppInner: React.FC<{activeView: View, setActiveView: (v: View) => void, onLogout: () => void}> = ({ activeView, setActiveView, onLogout }) => {
+    const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    const [isChatWidgetOpen, setChatWidgetOpen] = useState(false);
+    const { speechCode } = useLanguage();
+    const { settings } = useAccessibility();
+    const { actions: familyActions } = useFamilyStore();
+    const { startLiveSession, stopLiveSession, isLiveActive } = useLiveAudio();
+    
+    useEffect(() => { familyActions.hydrate(); }, [familyActions]);
+
+    useEffect(() => {
+        if (!isLiveActive) {
+            speak(`Opening ${activeView.replace(/-/g, ' ')}`, speechCode);
         }
-      }
+    }, [activeView, speechCode, isLiveActive]);
+
+    const handleToggleLive = () => {
+        if (isLiveActive) {
+            stopLiveSession();
+        } else {
+            startLiveSession();
+        }
     };
-    
-    const newDisplayText = getDisplayText();
-    setDisplayText(newDisplayText);
-    if (status === 'ACTIVE') {
-      speak(newDisplayText, language);
-    }
 
-  }, [status, location, language, symptomHistory]);
-
-  const handleKeyPress = (key: string) => {
-    if (key === 'CALL') {
-      setStatus('ACTIVE');
-      setLocation('WELCOME');
-      setHistory([]);
-      return;
-    }
-    if (key === 'END') {
-      stopSpeech();
-      setStatus('IDLE');
-      setLanguage('en');
-      return;
-    }
-    if (status === 'IDLE') return;
-
-    if (key === 'UP') {
-      screenRef.current?.scrollBy({ top: -60, behavior: 'smooth' });
-      return;
-    }
-    if (key === 'DOWN') {
-      screenRef.current?.scrollBy({ top: 60, behavior: 'smooth' });
-      return;
-    }
-
-    if (key === 'BACK' || key === 'LEFT') {
-      const prevLocation = history.pop();
-      if (prevLocation) {
-        setLocation(prevLocation);
-        setHistory([...history]);
-      } else if (location !== 'MAIN_MENU' && location !== 'WELCOME') {
-        setLocation('MAIN_MENU');
-      } else if (location === 'MAIN_MENU') {
-        setLocation('WELCOME');
-      }
-      return;
-    }
-
-    const newHistory = [...history, location];
-
-    if (location === 'WELCOME') {
-      const selectedLang = ivrFlowData.languages.find(l => l.key === key);
-      if (selectedLang) {
-        setLanguage(selectedLang.code);
-        setLocation('MAIN_MENU');
-        setHistory(newHistory);
-      }
-    } else if (location === 'MAIN_MENU') {
-      const selectedOption = ivrFlowData.mainMenu.find(o => o.key === key);
-      if (selectedOption?.subFlow) {
-        setLocation(`SUB_FLOW_${key}`);
-        setHistory(newHistory);
-      }
-    } else if (location.startsWith('SUB_FLOW_')) {
-      const menuKey = location.replace('SUB_FLOW_', '');
-      const menu = ivrFlowData.mainMenu.find(m => m.key === menuKey);
-      if (menu?.subFlow?.options) {
-        const selectedOption = menu.subFlow.options.find((o) => o.key === key);
-        if (selectedOption) {
-          if ('symptom' in selectedOption) {
-            const sympName = selectedOption.symptom[language] || selectedOption.symptom.en;
-            setSymptomHistory(prev => [sympName, ...prev].slice(0, 5));
-          }
-          setLocation(`RESPONSE_${menuKey}_${key}`);
-          setHistory(newHistory);
+    const renderView = () => {
+        switch (activeView) {
+          case 'dashboard': return <Dashboard setActiveView={setActiveView} />;
+          case 'ai-assistant': return <AIHealthAssistant setActiveView={setActiveView} isLowConnectivity={false} />;
+          case 'telemedicine': return <Telemedicine onClose={() => setActiveView('dashboard')} />;
+          case 'forum': return <CommunityForum />;
+          case 'wearables': return <WearableIntegration />;
+          case 'price-comparison': return <MedicineFinder setActiveView={setActiveView} isLowConnectivity={false} />;
+          case 'mental-health': return <MentalHealthSupport />;
+          case 'resource-finder': return <ResourceFinder />;
+          case 'symptom-checker': return <SymptomChecker />;
+          case 'emergency-mode': return <EmergencyMode setActiveView={setActiveView} />;
+          case 'medication-reminders': return <MedicationReminders />;
+          case 'profile': return <ProfilePage />;
+          case 'family-hub': return <FamilyHub setActiveView={setActiveView} />;
+          case 'medicine-identifier': return <MedicineIdentifier />;
+          case 'inclusive-bridge': return <InclusiveBridge />;
+          case 'vitals': return <VitalsView />;
+          case 'asha-connect': return <AshaConnect />;
+          case 'medical-camps': return <MedicalCamps />;
+          case 'health-schemes': return <HealthSchemes />;
+          case 'health-records': return <HealthRecords />;
+          case 'health-plan': return <PersonalizedHealthPlan isLowConnectivity={false} />;
+          case 'ai-insights': return <AIInsights />;
+          case 'predictive-analytics': return <PredictiveAnalytics isLowConnectivity={false} />;
+          case 'genomic-analysis': return <GenomicAnalysis />;
+          case 'quick-communicate': return <QuickCommunicate />;
+          case 'cart': return <Cart />;
+          case 'favorites': return <Favorites isLowConnectivity={false} />;
+          default: return <Dashboard setActiveView={setActiveView} />;
         }
-      }
-    }
-  };
+    };
 
-  const simulateSms = () => {
-    const randomSymptoms = ["Diabetes Update", "BP Reading: 120/80", "Cholesterol Sync", "New Allergy: Dust"];
-    const update = randomSymptoms[Math.floor(Math.random() * randomSymptoms.length)];
-    setSymptomHistory(prev => [`[SMS] ${update}`, ...prev].slice(0, 5));
-    alert(`Incoming SMS update: ${update}`);
-  };
-
-  return (
-    <div className="min-h-screen bg-brand-bg text-brand-text-primary font-sans flex flex-col items-center justify-between p-4 overflow-x-hidden">
-      <Header />
-      
-      <div className="mb-4">
-         <button 
-           onClick={simulateSms}
-           className="bg-brand-blue text-white px-4 py-2 rounded-full text-sm font-bold shadow-sm hover:bg-blue-700 transition-colors"
-         >
-           Simulate Receive SMS Update
-         </button>
-      </div>
-
-      <main className="flex-grow flex items-center justify-center w-full max-w-lg">
-        <PhoneSimulator 
-          screenRef={screenRef} 
-          displayText={displayText} 
-          onKeyPress={handleKeyPress} 
-          status={status} 
-        />
-      </main>
-      <Footer />
-    </div>
-  );
+    return (
+        <div className={`flex h-screen font-sans overflow-hidden ${settings.largeTextMode ? 'text-lg' : ''}`}>
+            <VisualCuesOverlay />
+            <LiveVoiceInterface />
+            <ChatbotWidget isOpen={isChatWidgetOpen} onClose={() => setChatWidgetOpen(false)} />
+            <Sidebar activeView={activeView} setActiveView={setActiveView} isMobileOpen={isMobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} onLogout={onLogout} />
+            <div className="flex-1 flex flex-col overflow-hidden relative">
+                <MobileHeader onMenuClick={() => setMobileSidebarOpen(true)} />
+                <main className="flex-1 p-4 sm:p-6 lg:p-10 overflow-y-auto bg-slate-50">
+                    <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20">
+                        <NotificationBell />
+                    </div>
+                    {renderView()}
+                </main>
+            </div>
+            <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-4">
+                <EmergencySOSButton setActiveView={setActiveView} />
+                <VoiceControlButton toggleListening={handleToggleLive} />
+                <ChatAssistantButton isOpen={isChatWidgetOpen} onClick={() => setChatWidgetOpen(!isChatWidgetOpen)} />
+            </div>
+            <CommandToast />
+            <MedicationReminder />
+        </div>
+    );
 };
 
 export default App;

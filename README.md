@@ -1,15 +1,20 @@
-##  AllWays-Care IVR (Voice Version)
-The IVR system ensures universal access, especially for those without smartphones or digital literacy.
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-### **Core Capabilities**
-* **Multilingual Support:** Interactive prompts in **10 Indian languages**.
-* **Inclusive Design:**  **For the Blind:** Voice-guided navigation and health task updates.
-    * **For the Speech-Impaired:** Keypad-only navigation (DTMF).
-    * **For the Deaf:** Missed-call triggers and automated SMS alerts.
-* **Health Management:** Automated medicine reminders and direct connection to local **ASHA workers**.
-* **Emergency Protocol:** Trigger a high-priority alert to caregivers by pressing a single key during a call.
+# Run and deploy your AI Studio app
 
-### **Technical Implementation**
-* **Telephony:** Exotel API integration.
-* **Language Processing:** Google Text-to-Speech (TTS) & Speech-to-Text (STT) for regional dialects.
-* **Backend:** Python-based logic to sync IVR inputs with the central health database.
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/drive/1ObG5h_9Kt2UKsIf5pwhk7Xmc9pv-iVQg
+
+## Run Locally
+
+**Prerequisites:**  Node.js
+
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
