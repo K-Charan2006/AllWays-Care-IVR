@@ -1,20 +1,53 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+#  AllWays-Care-IVR
 
-# Run and deploy your AI Studio app
+**Universal IVR health lifeline for elderly & disabled users** — a voice-based service that works on basic phones via toll-free numbers. It provides medicine reminders, access for ASHA workers, emergency alerts, and accessibility for users who are blind, speech-impaired, or deaf. No internet or smartphone needed. 
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/drive/1ObG5h_9Kt2UKsIf5pwhk7Xmc9pv-iVQg
+##  Features
 
-## Run Locally
+-  **Works on basic feature phones**
+-  **10 languages supported**
+-  Voice-driven **medicine reminders**
+-  **One-key emergency alerts**
+-  Access for **ASHA workers / caregivers**
+-  Accessible to users with visual, speech, or hearing impairments
+-  No internet required — works over toll-free numbers :contentReference[oaicite:2]{index=2}
 
-**Prerequisites:**  Node.js
+---
 
+##  Tech Stack
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- **TypeScript**
+- **React (Vite)**
+- HTML  
+- Other configs and environment settings (see `package.json`, `vite.config.ts`, etc.) :contentReference[oaicite:3]{index=3}
+
+---
+
+##  Installation / Development
+
+### Prerequisites
+
+- Node.js (v14 or above recommended)
+- npm or yarn
+
+### Steps
+
+```bash
+# Clone the repo
+git clone https://github.com/K-Charan2006/AllWays-Care-IVR.git
+cd AllWays-Care-IVR
+
+# Install dependencies
+npm install
+# or
+yarn
+
+# Set environment variables
+# Create a `.env.local` file and add your required keys (if any)
+
+# Start the app
+npm run dev
+# or
+yarn dev
